@@ -24,11 +24,11 @@ jobs:
           target: esp32c3
 
       - name: Build firmware
-        shell: bash
         run: |
-          . $IDF_PATH/export.sh
           idf.py build
 
+      - name: Prepare release artifacts
+        run: |
           # Create releases directory
           mkdir -p releases
 
