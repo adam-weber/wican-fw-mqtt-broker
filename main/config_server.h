@@ -103,6 +103,8 @@ typedef struct _device_config
 	char mqtt_tx_topic[64];
 	char mqtt_rx_topic[64];
 	char mqtt_status_topic[64];
+	char mqtt_broker_en[10];
+	char mqtt_broker_port[32];
 }device_config_t;
 
 
@@ -160,3 +162,5 @@ int8_t config_server_get_wakeup_time(uint32_t *wakeup_time);
 wifi_security_t config_server_get_sta_security(void);
 int8_t config_server_get_ap_auto_disable(void);
 int8_t config_server_get_keep_alive(uint32_t *keep_alive);
+int8_t config_server_mqtt_broker_en_config(void);
+int32_t config_server_get_mqtt_broker_port(void);

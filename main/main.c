@@ -50,6 +50,7 @@
 #include "wc_uart.h"
 #include "elm327.h"
 #include "mqtt.h"
+#include "mqtt_broker.h"
 #include "esp_mac.h"
 #include "ftp.h"
 #include "autopid.h"
@@ -502,6 +503,23 @@ void app_main(void)
 
 
 	wifi_network_init(NULL, NULL);
+
+	// Initialize MQTT Broker if enabled
+	if(config_server_mqtt_broker_en_config())
+	{
+		int32_t broker_port = config_server_get_mqtt_broker_port();
+		ESP_LOGI(TAG, "Initializing MQTT broker on port %d", (int)broker_port);
+
+		if(mqtt_broker_init((uint16_t)broker_port) == 0)
+		{
+			ESP_LOGI(TAG, "MQTT broker initialized successfully");
+		}
+		else
+		{
+			ESP_LOGE(TAG, "Failed to initialize MQTT broker");
+		}
+	}
+
 	int32_t port = config_server_get_port();
 
 	if(port == -1)

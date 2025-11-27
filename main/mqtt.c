@@ -613,10 +613,30 @@ void mqtt_publish(char *topic, char *data, int len, int qos, int retain)
 void mqtt_init(char* id, uint8_t connected_led, QueueHandle_t *xtx_queue)
 {
     xmqtt_semaphore = xSemaphoreCreateMutex();
+
+    // Check if local broker is enabled - if so, connect to localhost
+    const char* mqtt_uri;
+    int32_t mqtt_port;
+
+    if(config_server_mqtt_broker_en_config() == 1)
+    {
+        // Connect to local broker
+        mqtt_uri = "mqtt://127.0.0.1";
+        mqtt_port = config_server_get_mqtt_broker_port();
+        ESP_LOGI(TAG, "Connecting to local MQTT broker on port %d", (int)mqtt_port);
+    }
+    else
+    {
+        // Connect to external broker (original behavior)
+        mqtt_uri = config_server_get_mqtt_url();
+        mqtt_port = config_server_get_mqtt_port();
+        ESP_LOGI(TAG, "Connecting to external MQTT broker: %s:%d", mqtt_uri, (int)mqtt_port);
+    }
+
     esp_mqtt_client_config_t mqtt_cfg = {
 		// .session.protocol_ver = MQTT_PROTOCOL_V_5,
-		.broker.address.uri = config_server_get_mqtt_url(),
-		.broker.address.port = config_server_get_mqtt_port(),
+		.broker.address.uri = mqtt_uri,
+		.broker.address.port = mqtt_port,
 		.credentials.username = config_server_get_mqtt_user(),
 		.credentials.authentication.password = config_server_get_mmqtt_pass(),
 		.network.disable_auto_reconnect = false,
