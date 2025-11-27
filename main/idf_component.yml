@@ -1,7 +1,7 @@
 ## IDF Component Manager Manifest File
 dependencies:
   espressif/mdns: "*"
-  espressif/mosquitto: "*"
+  espressif/mosquitto: "^2.0.20"
   ## Required IDF version
   idf:
     version: ">=4.1.0"

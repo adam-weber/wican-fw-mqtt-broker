@@ -22,7 +22,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "mosquitto_broker.h"
+#include "mosq_broker.h"
 #include "mqtt_broker.h"
 
 static const char *TAG = "mqtt_broker";
