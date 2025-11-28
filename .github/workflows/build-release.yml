@@ -29,8 +29,19 @@ jobs:
           # Get version
           VERSION="${GITHUB_REF_NAME}"
 
+          # Find the actual binary file (name is dynamic based on git SHA)
+          BIN_FILE=$(find build -name "wican-fw_*.bin" -type f | head -1)
+
+          if [ -z "$BIN_FILE" ]; then
+            echo "Error: Binary file not found"
+            ls -la build/
+            exit 1
+          fi
+
+          echo "Found binary: $BIN_FILE"
+
           # Copy binary
-          cp build/wican-fw.bin "releases/wican-broker-${VERSION}.bin"
+          cp "$BIN_FILE" "releases/wican-broker-${VERSION}.bin"
 
           # Install esptool for merging binaries
           pip install esptool
@@ -43,7 +54,7 @@ jobs:
             --flash_size 4MB \
             0x0 build/bootloader/bootloader.bin \
             0x8000 build/partition_table/partition-table.bin \
-            0x10000 build/wican-fw.bin || true
+            0x10000 "$BIN_FILE" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
