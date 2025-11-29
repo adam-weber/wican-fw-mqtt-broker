@@ -59,6 +59,12 @@ typedef enum
 	WIFI_MAX
 }wifi_security_t;
 
+typedef enum {
+	PUBLISH_MODE_STATIC = 0,   // Vehicle profile only (legacy)
+	PUBLISH_MODE_DYNAMIC = 1,  // On-demand subscriptions only
+	PUBLISH_MODE_HYBRID = 2    // Both (default/recommended)
+} mqtt_publish_mode_t;
+
 typedef struct _device_config
 {
 	char wifi_mode[65];
@@ -105,6 +111,7 @@ typedef struct _device_config
 	char mqtt_status_topic[64];
 	char mqtt_broker_en[10];
 	char mqtt_broker_port[32];
+	uint8_t mqtt_publish_mode;  // mqtt_publish_mode_t
 }device_config_t;
 
 

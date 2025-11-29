@@ -51,6 +51,7 @@
 #include "elm327.h"
 #include "mqtt.h"
 #include "mqtt_broker.h"
+#include "vehicle_detect.h"
 #include "esp_mac.h"
 #include "ftp.h"
 #include "autopid.h"
@@ -241,6 +242,8 @@ static void can_rx_task(void *pvParameters)
 {
 //	static uint32_t num_msg = 0;
 	static int64_t time_old = 0;
+	static bool auto_detect_triggered = false;
+	static uint32_t can_msg_count = 0;
 //	float bvoltage = 0;
 //	time_old = esp_timer_get_time();
 	while(1)
@@ -278,6 +281,30 @@ static void can_rx_task(void *pvParameters)
         while(can_receive(&rx_msg, 0) ==  ESP_OK)
         {
 //        	num_msg++;
+
+        	// Auto-detect vehicle on first CAN activity
+        	if (!auto_detect_triggered)
+        	{
+        		can_msg_count++;
+
+        		// After seeing 50 messages, trigger detection
+        		if (can_msg_count >= 50)
+        		{
+        			ESP_LOGI(TAG, "CAN activity detected (%lu msgs), starting vehicle auto-detection", can_msg_count);
+
+        			int ret = vehicle_detect_start_async();
+        			if (ret == 0)
+        			{
+        				ESP_LOGI(TAG, "Vehicle auto-detection started");
+        			}
+        			else
+        			{
+        				ESP_LOGW(TAG, "Failed to start vehicle auto-detection: %d", ret);
+        			}
+
+        			auto_detect_triggered = true;  // Only run once per boot
+        		}
+        	}
 
         	process_led(1);
 
@@ -518,6 +545,45 @@ void app_main(void)
 		{
 			ESP_LOGE(TAG, "Failed to initialize MQTT broker");
 		}
+	}
+
+	// Initialize vehicle detection
+	ESP_LOGI(TAG, "Initializing vehicle detection");
+	if(vehicle_detect_init() == 0)
+	{
+		// Load fingerprints from SPIFFS
+		FILE *fp = fopen("/spiffs/vehicle_fingerprints.json", "r");
+		if (fp)
+		{
+			fseek(fp, 0, SEEK_END);
+			long fsize = ftell(fp);
+			fseek(fp, 0, SEEK_SET);
+
+			char *json_data = malloc(fsize + 1);
+			if (json_data)
+			{
+				size_t read_size = fread(json_data, 1, fsize, fp);
+				json_data[read_size] = 0;
+
+				int loaded = vehicle_detect_load_fingerprints(json_data);
+				ESP_LOGI(TAG, "Loaded %d vehicle fingerprints", loaded);
+
+				free(json_data);
+			}
+			else
+			{
+				ESP_LOGE(TAG, "Failed to allocate memory for fingerprints");
+			}
+			fclose(fp);
+		}
+		else
+		{
+			ESP_LOGW(TAG, "No vehicle_fingerprints.json found in SPIFFS");
+		}
+	}
+	else
+	{
+		ESP_LOGE(TAG, "Failed to initialize vehicle detection");
 	}
 
 	int32_t port = config_server_get_port();

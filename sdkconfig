@@ -2047,6 +2047,13 @@ CONFIG_MDNS_PREDEF_NETIF_AP=y
 CONFIG_MDNS_PREDEF_NETIF_ETH=y
 # end of MDNS Predefined interfaces
 # end of mDNS
+
+#
+# Mosquitto
+#
+CONFIG_MOSQ_IS_ENABLED=y
+# CONFIG_MOSQ_ENABLE_SYS is not set
+# end of Mosquitto
 # end of Component config
 
 # CONFIG_IDF_EXPERIMENTAL_FEATURES is not set

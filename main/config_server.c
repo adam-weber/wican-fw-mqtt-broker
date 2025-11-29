@@ -48,6 +48,7 @@
 #include<stdio.h>
 #include <stdlib.h>
 #include "ver.h"
+#include "vehicle_detect.h"
 
 #include <esp_wifi.h>
 #include <esp_event.h>
@@ -1382,6 +1383,110 @@ static esp_err_t scan_available_pids_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* Vehicle Detection Handlers */
+
+static esp_err_t vehicle_detect_start_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "Starting vehicle detection");
+
+    // Start async detection
+    int ret = vehicle_detect_start_async();
+
+    cJSON *root = cJSON_CreateObject();
+
+    if (ret == 0) {
+        cJSON_AddStringToObject(root, "status", "started");
+        cJSON_AddStringToObject(root, "message", "Vehicle detection started");
+    } else if (ret == -2) {
+        cJSON_AddStringToObject(root, "status", "error");
+        cJSON_AddStringToObject(root, "message", "Detection already in progress");
+        httpd_resp_set_status(req, "409 Conflict");
+    } else {
+        cJSON_AddStringToObject(root, "status", "error");
+        cJSON_AddStringToObject(root, "message", "Failed to start detection");
+        httpd_resp_set_status(req, "500 Internal Server Error");
+    }
+
+    const char *resp = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+
+    free((void *)resp);
+    cJSON_Delete(root);
+
+    return ESP_OK;
+}
+
+static esp_err_t vehicle_detect_status_handler(httpd_req_t *req)
+{
+    detection_status_t status;
+    int ret = vehicle_detect_get_status(&status);
+
+    cJSON *root = cJSON_CreateObject();
+
+    if (ret == 0) {
+        cJSON_AddBoolToObject(root, "in_progress", status.in_progress);
+        cJSON_AddNumberToObject(root, "progress_percent", status.progress_percent);
+        cJSON_AddNumberToObject(root, "elapsed_ms", status.elapsed_ms);
+        cJSON_AddNumberToObject(root, "addresses_seen", status.addresses_seen);
+    } else {
+        cJSON_AddStringToObject(root, "error", "Failed to get status");
+        httpd_resp_set_status(req, "500 Internal Server Error");
+    }
+
+    const char *resp = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+
+    free((void *)resp);
+    cJSON_Delete(root);
+
+    return ESP_OK;
+}
+
+static esp_err_t vehicle_detect_result_handler(httpd_req_t *req)
+{
+    detection_result_t result;
+    int ret = vehicle_detect_get_result(&result);
+
+    cJSON *root = cJSON_CreateObject();
+
+    if (ret == 0) {
+        cJSON_AddBoolToObject(root, "detection_complete", result.detection_complete);
+        cJSON_AddNumberToObject(root, "scan_duration_ms", result.scan_duration_ms);
+        cJSON_AddNumberToObject(root, "total_addresses_seen", result.total_addresses_seen);
+        cJSON_AddNumberToObject(root, "match_count", result.match_count);
+
+        cJSON *matches = cJSON_CreateArray();
+        for (int i = 0; i < result.match_count; i++) {
+            cJSON *match = cJSON_CreateObject();
+            cJSON_AddStringToObject(match, "vehicle_name", result.matches[i].vehicle_name);
+            cJSON_AddStringToObject(match, "year_range", result.matches[i].year_range);
+            cJSON_AddNumberToObject(match, "confidence", result.matches[i].confidence);
+            cJSON_AddNumberToObject(match, "matched_addresses", result.matches[i].matched_addresses);
+            cJSON_AddNumberToObject(match, "total_required", result.matches[i].total_required);
+            cJSON_AddItemToArray(matches, match);
+        }
+        cJSON_AddItemToObject(root, "matches", matches);
+    } else if (ret == -1) {
+        cJSON_AddStringToObject(root, "status", "not_complete");
+        cJSON_AddStringToObject(root, "message", "Detection not complete yet");
+        httpd_resp_set_status(req, "202 Accepted");
+    } else {
+        cJSON_AddStringToObject(root, "error", "Failed to get result");
+        httpd_resp_set_status(req, "500 Internal Server Error");
+    }
+
+    const char *resp = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+
+    free((void *)resp);
+    cJSON_Delete(root);
+
+    return ESP_OK;
+}
+
 static const httpd_uri_t index_uri = {
     .uri       = "/",
     .method    = HTTP_GET,
@@ -1516,6 +1621,28 @@ static const httpd_uri_t scan_available_pids_uri = {
     .handler   = scan_available_pids_handler,
     .user_ctx  = NULL
 };
+
+static const httpd_uri_t uri_vehicle_detect_start = {
+    .uri       = "/api/vehicle/detect",
+    .method    = HTTP_POST,
+    .handler   = vehicle_detect_start_handler,
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t vehicle_detect_status = {
+    .uri       = "/api/vehicle/detect/status",
+    .method    = HTTP_GET,
+    .handler   = vehicle_detect_status_handler,
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t vehicle_detect_result = {
+    .uri       = "/api/vehicle/detect/result",
+    .method    = HTTP_GET,
+    .handler   = vehicle_detect_result_handler,
+    .user_ctx  = NULL
+};
+
 static void config_server_load_cfg(char *cfg)
 {
 	cJSON * root, *key = 0;
@@ -2235,7 +2362,7 @@ static httpd_handle_t config_server_init(void)
                        );
 
     // Start the httpd server
-	config.max_uri_handlers = 18;
+	config.max_uri_handlers = 21;
 	config.stack_size = 5120;
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK)
@@ -2260,6 +2387,9 @@ static httpd_handle_t config_server_init(void)
 		httpd_register_uri_handler(server, &load_car_config_uri);
 		httpd_register_uri_handler(server, &store_car_data_uri);
 		httpd_register_uri_handler(server, &scan_available_pids_uri);
+		httpd_register_uri_handler(server, &uri_vehicle_detect_start);
+		httpd_register_uri_handler(server, &vehicle_detect_status);
+		httpd_register_uri_handler(server, &vehicle_detect_result);
         #if CONFIG_EXAMPLE_BASIC_AUTH
         httpd_register_basic_auth(server);
         #endif

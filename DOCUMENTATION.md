@@ -157,12 +157,19 @@ This firmware includes an **embedded MQTT broker** (Eclipse Mosquitto) running d
 
 Automatically detect your vehicle by scanning the CAN bus and matching against known fingerprints (similar to comma.ai openpilot).
 
+**This feature runs automatically** when you plug in the OBD connector and turn on the ignition. No user interaction needed!
+
 ### How It Works
 
-1. **Scan CAN Bus** - Monitors which CAN addresses are active
-2. **Match Fingerprints** - Compares against database of known vehicles
-3. **Calculate Confidence** - Ranks matches by confidence score
-4. **Auto-Load Profile** - Automatically configures signals for your vehicle
+1. **Plug in OBD** - Connect to vehicle's OBD port
+2. **Turn ignition on** - CAN bus becomes active
+3. **Auto-trigger** - After 50 CAN messages (~1-2 seconds), detection starts automatically
+4. **Scan CAN Bus** - Monitors which CAN addresses are active for 15 seconds
+5. **Match Fingerprints** - Compares against database of known vehicles
+6. **Calculate Confidence** - Ranks matches by confidence score
+7. **Auto-Load Profile** - Automatically configures signals for your vehicle
+
+**Runs once per boot** - Detection only triggers on first CAN activity after power-up.
 
 ### Supported Vehicles
 
@@ -179,16 +186,17 @@ Pre-loaded fingerprints for 10 vehicles:
 
 ### Using Auto-Detection
 
-#### Via Web UI
+**It's automatic!** Just plug in the OBD connector and turn on the ignition. The system will:
+- Detect CAN activity
+- Start fingerprinting automatically
+- Identify your vehicle
+- Load the correct profile
 
-1. Navigate to Automate tab
-2. Click "🔍 Auto-Detect Vehicle"
-3. Wait 15 seconds while scanning
-4. Review detected vehicles with confidence scores
-5. Click "Use This Profile" on your vehicle
-6. Done!
+No button clicks or configuration needed.
 
-#### Via REST API
+#### Optional: Manual Trigger via API
+
+You can also trigger detection manually if needed:
 
 **Start detection:**
 ```bash
@@ -327,9 +335,8 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 **New:**
 - `main/mqtt_broker.c/h` - MQTT broker implementation
-- `main/vehicle_detect.c/h` - Vehicle detection
-- `vehicle_fingerprints.json` - Fingerprint database
-- `VEHICLE_DETECTION_INTEGRATION.md` - Integration guide
+- `main/vehicle_detect.c/h` - Vehicle detection (automatic)
+- `vehicle_fingerprints.json` - Fingerprint database (10 vehicles)
 
 ---
 
@@ -440,7 +447,6 @@ Keep track of modified files for easier merges:
 
 ## Support & Resources
 
-- 📖 **Integration Guide**: [VEHICLE_DETECTION_INTEGRATION.md](./VEHICLE_DETECTION_INTEGRATION.md)
 - 🐛 **Issues**: [GitHub Issues](https://github.com/adam-weber/wican-fw-mqtt-broker/issues)
 - 🔧 **Upstream**: [Official WiCAN](https://github.com/meatpiHQ/wican-fw)
 - 📚 **Mosquitto Docs**: [mosquitto.org](https://mosquitto.org)
